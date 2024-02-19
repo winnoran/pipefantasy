@@ -1,0 +1,624 @@
+;;To run the program please use (pipe-fantasy FIRST-GS)
+
+(require 2htdp/image)
+(require 2htdp/universe)
+
+
+;;PART 1
+(define-struct pipe [top bot left right])
+;; A Pipe is a (make-pipe Boolean Boolean Boolean Boolean)
+;; Interpretation: a pipe with openings in the given directions. A  #true for 
+;; one of top, bot, left, right indicates an opening in that direction.
+;; top is true if the pipe opens at the top
+;; bot is true if the pipe opens at the bottom
+;; left is true if the pipe opens at the left
+;; right is true if the pipe opens at the right
+
+(define PIPE-TL (make-pipe #true #false #true #false))
+(define PIPE-TR (make-pipe #true #false #false #true))
+(define PIPE-TB (make-pipe #true #true #false #false))
+(define PIPE-LR (make-pipe #false #false #true #true))
+(define PIPE-BL (make-pipe #false #true #true #false))
+(define PIPE-BR (make-pipe #false #true #false #true))
+(define PIPE-TBLR (make-pipe #true #true #true #true))
+(define START-PIPE-T (make-pipe #true #false #false #false))
+(define START-PIPE-B (make-pipe #false #true #false #false))
+(define START-PIPE-L (make-pipe #false #false #true #false))
+(define START-PIPE-R (make-pipe #false #false #false #true))
+
+(define (pipe-template p)
+  (... (pipe-top p)...
+       (pipe-bot p)...
+       (pipe-left p)...
+       (pipe-right p)...))
+
+(define ALL-PIPES (list PIPE-TL PIPE-TR PIPE-TB PIPE-LR PIPE-BL PIPE-BR PIPE-TBLR))
+
+;; pipe->image: Pipe Integer Integer Boolean Direction -> Image
+;; Draws the given pipe on a square tile with length tile-side-length. The width
+;; of the pipe is pipe-width. Pipe-width should be less than tile-side-length
+(define (pipe->image pipe tile-side-length pipe-width filled? direction)
+  (local (
+          ;; top-rect : Image
+          [define top-rect (if (pipe-top pipe)
+                               (rectangle pipe-width (/ tile-side-length 2) "solid" (if filled? "green" "black"))
+                               (rectangle pipe-width (/ tile-side-length 2) "solid" "transparent"))]
+          ;; bottom-rect : Image 
+          [define bottom-rect (if (pipe-bot pipe)
+                                  (rectangle pipe-width (/ tile-side-length 2) "solid" (if filled? "green" "black"))
+                                  (rectangle pipe-width (/ tile-side-length 2) "solid" "transparent"))]
+          ;; right-rect : Image 
+          [define right-rect (if (pipe-right pipe)
+                                 (rotate 90 (rectangle pipe-width (/ tile-side-length 2) "solid" (if filled? "green" "black")))
+                                 (rotate 90 (rectangle pipe-width (/ tile-side-length 2) "solid" "transparent")))]
+          ;; left-rect : Image 
+          [define left-rect(if (pipe-left pipe)
+                               (rotate 90 (rectangle pipe-width (/ tile-side-length 2) "solid" (if filled? "green" "black")))
+                               (rotate 90 (rectangle pipe-width (/ tile-side-length 2) "solid" "transparent")))])
+                                        
+                                  
+     (if (and (pipe-left pipe) (and (pipe-right pipe) (and (pipe-top pipe) (pipe-bot pipe))))
+         (overlay
+          (overlay
+           (square pipe-width "solid" (if filled? "green" "black"))
+           (overlay 
+            (rectangle pipe-width tile-side-length "solid"
+                       (if (and (or (direction-top direction)(direction-bottom direction)) filled?) "green" "black"))
+            (rotate 90 (rectangle pipe-width tile-side-length "solid"
+                                  (if (and(or (direction-right direction)(direction-left direction)) filled?)
+                                      "green" "black")))))
+          (square tile-side-length "solid" "grey"))        
+         (overlay/align "middle" "top" top-rect
+                        (overlay/align "middle" "bottom" bottom-rect
+                                       (overlay/align "left" "middle" left-rect
+                                                      (overlay/align "right" "middle" right-rect
+                                                                     (overlay/align "middle" "middle"
+                                                                                    (square pipe-width "solid"
+                                                                                            (if filled? "green" "black"))
+                                                                                    (square tile-side-length "solid" "gray")))))))))
+;;PART 2
+
+(define-struct direction [right left top bottom])
+;; a direction is a (make-direction Boolean Boolean Boolean Boolean)
+;; a direction is one of:
+;; - Right is true if the direction is right
+;; - Left is true if the direction is left
+;; - Top is true if the direction is up
+;; - Bottom is true if the direction is down
+(define DIRECTION-TOP (make-direction #false #false #true #false))
+(define DIRECTION-BOTTOM (make-direction #false #false #false #true))
+(define DIRECTION-LEFT (make-direction #false #true #false #false))
+(define DIRECTION-RIGHT (make-direction #true #false #false #false))
+(define DIRECTION-NONE (make-direction #false #false #false #false))
+
+
+(define (direction-template d)
+  (...(direction-right d)...
+      (direction-left d)...
+      (direction-top d)...
+      (direction-bottom d)...))
+
+
+
+(define-struct pipe-posn [pipe x y filled? direction])
+;; a PipePosn is a (make-pipe-posn Number Number Direction)
+;; a PipePosn is an:
+;; - pipe is the pipe that the position is given for
+;; - x is the x position of the pipe
+;; - y is the y position of the pipe
+;; - filled? is whether or not the pipe is filled
+;; - direction is the direction for which goo would flow through the pipe
+
+(define PIPE-POSN-0 (make-pipe-posn START-PIPE-T 4 4 #true DIRECTION-BOTTOM))
+(define PIPE-POSN-1 (make-pipe-posn PIPE-TR 2 2 #false DIRECTION-NONE))
+(define PIPE-POSN-2 (make-pipe-posn PIPE-TBLR 2 5 #false DIRECTION-NONE))
+(define PIPE-POSN-3 (make-pipe-posn PIPE-BL 5 5 #false DIRECTION-NONE))
+(define PIPE-POSN-4 (make-pipe-posn PIPE-BR 3 3 #false DIRECTION-NONE))
+(define PIPE-POSN-5 (make-pipe-posn PIPE-TB 3 4 #false DIRECTION-NONE))
+(define PIPE-POSN-6 (make-pipe-posn PIPE-TR 3 5 #false DIRECTION-NONE))
+(define PIPE-POSN-7 (make-pipe-posn PIPE-LR 4 5 #false DIRECTION-NONE))
+(define PIPE-POSN-8 (make-pipe-posn PIPE-BL 4 3 #true DIRECTION-LEFT))
+(define PIPE-POSN-9 (make-pipe-posn START-PIPE-B 0 1 #true DIRECTION-BOTTOM))
+(define PIPE-POSN-10 (make-pipe-posn PIPE-TR 0 2 #false DIRECTION-NONE))
+(define PIPE-POSN-11 (make-pipe-posn START-PIPE-L 3 2 #true DIRECTION-LEFT))
+(define PIPE-POSN-12 (make-pipe-posn PIPE-LR 1 2 #false DIRECTION-NONE))
+
+
+(define (pipe-posn-template pp)
+  (... (pipe-posn-pipe pp)...
+       (pipe-posn-x pp)...
+       (pipe-posn-y pp)...
+       (pipe-posn-filled? pp)
+       (direction-template(pipe-posn-pp pp))...))
+
+
+(define-struct grid [pipes dimensions])
+;; a Grid is a (make-grid [List-of Pipes] Number]
+;; a Grid is a:
+;; - Pipes is the list of pipes on the grid
+;; - Dimesons is the dimensions of the grid square
+
+(define STARTING-GRID (make-grid empty 7))
+(define GRID-0 (make-grid (list PIPE-POSN-0) 7))
+(define GRID-1 (make-grid (list PIPE-POSN-0 PIPE-POSN-1 PIPE-POSN-2 PIPE-POSN-3) 10))
+(define GRID-2 (make-grid (list PIPE-POSN-0 PIPE-POSN-1 PIPE-POSN-3) 6))
+(define GRID-3 (make-grid (list PIPE-POSN-0 PIPE-POSN-1) 5))
+(define GRID-4 (make-grid (list PIPE-POSN-0 PIPE-POSN-8 PIPE-POSN-4 PIPE-POSN-5 PIPE-POSN-6 PIPE-POSN-7) 7))
+(define GRID-5 (make-grid (list PIPE-POSN-9 PIPE-POSN-10) 7))
+(define GRID-6 (make-grid (list PIPE-POSN-11 PIPE-POSN-1) 7))
+(define GRID-7 (make-grid (list PIPE-POSN-0 PIPE-POSN-8) 7))
+(define GRID-8 (make-grid (list PIPE-POSN-9 PIPE-POSN-10 PIPE-POSN-12) 7))
+
+
+(define (grid-template g)
+  (... (grid-pipes g)...
+       (grid-dimensions g)...))
+
+
+;; place-pipe: Grid Pipe Integer Integer -> Grid
+;; Places the pipe on the grid at the given row and column. We assume that the
+;; row and column are valid positions on the grid.
+(define (place-pipe grid pipe row col)
+  (make-grid (cons (make-pipe-posn pipe row col #false DIRECTION-NONE)
+                   (grid-pipes grid))
+             (grid-dimensions grid)))
+
+(check-expect (place-pipe GRID-1 PIPE-BL 3 10) (make-grid
+                                                (list (make-pipe-posn PIPE-BL 3 10 #false DIRECTION-NONE)
+                                                      PIPE-POSN-0 PIPE-POSN-1 PIPE-POSN-2 PIPE-POSN-3) 10))
+(check-expect (place-pipe GRID-2 PIPE-TBLR 4 5) (make-grid
+                                                 (list (make-pipe-posn PIPE-TBLR 4 5 #false DIRECTION-NONE)
+                                                       PIPE-POSN-0 PIPE-POSN-1 PIPE-POSN-3) 6))
+(check-expect (place-pipe GRID-3 PIPE-TR 6 3) (make-grid (list (make-pipe-posn PIPE-TR 6 3 #false DIRECTION-NONE) PIPE-POSN-0 PIPE-POSN-1) 5))
+
+;; pipe-at: Grid Integer Integer -> [Optional Pipe]
+;; Produces the pipe at the given row and column, or #false if that position is
+;; is blank. We assume that the row and column are valid positions on the grid.
+(define (pipe-at grid row col)
+  (cond
+    [(empty? (grid-pipes grid)) #false]
+    [else (if (and (= (pipe-posn-x (first (grid-pipes grid))) col) (= (pipe-posn-y (first(grid-pipes grid))) row))
+              (pipe-posn-pipe (first(grid-pipes grid)))
+              (pipe-at (make-grid (rest(grid-pipes grid)) (grid-dimensions grid)) row col))]))
+
+(check-expect (pipe-at GRID-1 2 2) PIPE-TR)
+(check-expect (pipe-at GRID-2 2 3) #false)
+(check-expect (pipe-at GRID-3 5 5) #false)
+
+
+;; pipe-at-filled: Grid Integer Integer -> [Optional Pipe-Posn]
+;; Produces the pipe-posn at the given row and column, or #false if that position is
+;; is blank. We assume that the row and column are valid positions on the grid.
+(define (pipe-at-filled grid row col)
+  (cond
+    [(empty? (grid-pipes grid)) #false]
+    [else (if (and (= (pipe-posn-x (first (grid-pipes grid))) col) (= (pipe-posn-y (first(grid-pipes grid))) row))
+              (first (grid-pipes grid))
+              (pipe-at-filled (make-grid (rest(grid-pipes grid)) (grid-dimensions grid)) row col))]))
+
+(check-expect (pipe-at-filled GRID-1 2 2) PIPE-POSN-1)
+(check-expect (pipe-at-filled GRID-2 2 3) #false)
+(check-expect (pipe-at-filled GRID-3 5 5) #false)
+
+
+
+;; grid->image: Grid Integer Integer -> Image
+;; Draws the grid of pipes. Every tile should be a square with side length
+;; tile-side-length and every pipe should have width pipe-width.
+(define (grid->image grid tile-side-length pipe-width)
+  (local (
+          ;;draw-square : Number -> Image
+          [define (draw-square n) (square tile-side-length "outline" "grey")]
+          ;; build-rows : Number -> Image
+          [define (build-rows n)
+            (foldr beside (square tile-side-length "outline" "grey") (build-list (- (grid-dimensions grid) 1) draw-square))]
+          ;; all-rows : [List-of Image]
+          [define all-rows (build-list (- (grid-dimensions grid) 1) build-rows)]
+          ;; grid-all: image
+          [define grid-all (foldr above (foldr beside (square tile-side-length "outline" "grey") (build-list (- (grid-dimensions grid) 1) draw-square)) all-rows)]
+          ;; place-pipes : Grid -> Image 
+          [define (place-pipes grid)
+            (cond
+              [(empty? (grid-pipes grid)) grid-all]
+              [else (place-image
+                     (pipe->image (pipe-posn-pipe (first (grid-pipes grid))) tile-side-length pipe-width (pipe-posn-filled? (first (grid-pipes grid))) (pipe-posn-direction (first (grid-pipes grid))))
+                     (+ (*(pipe-posn-x (first(grid-pipes grid))) tile-side-length)(/ tile-side-length 2))
+                     (+ (* (pipe-posn-y (first(grid-pipes grid))) tile-side-length)(/ tile-side-length 2))
+                     (place-pipes (make-grid (rest (grid-pipes grid)) (grid-dimensions grid))))])])
+    (place-pipes grid)))
+
+
+(define-struct goo-flow [path direction])
+;; a GooFlow is a (make-goo-flow [List-of Pipe-Posn] Direction)
+;; a GooFlow is a:
+;; - path is a list of Pipe-Posn that shows what pipes have been filled with goo
+;; - direction is the current direction the goo is moving
+(define GOO-FLOW-1 (make-goo-flow (list PIPE-POSN-0) DIRECTION-TOP))
+(define GOO-FLOW-2 (make-goo-flow (list PIPE-POSN-0 PIPE-POSN-1 PIPE-POSN-2 PIPE-POSN-3) DIRECTION-TOP))
+(define GOO-FLOW-3 (make-goo-flow (list PIPE-POSN-0 PIPE-POSN-8) DIRECTION-LEFT))
+(define GOO-FLOW-4 (make-goo-flow (list PIPE-POSN-9) DIRECTION-BOTTOM))
+(define GOO-FLOW-5 (make-goo-flow (list PIPE-POSN-11) DIRECTION-LEFT))
+
+
+(define (goo-flow-template g)
+  (... (pipe-posn-template (goo-flow-path g))...
+       (direction-template (goo-flow-direction g)...)))
+
+;;grid-goo-propagate: GooFlow Grid -> GooFlow
+;;determines if goo can flow into the next pipe and if possible
+;; adds goo to said pipe and moves to the next pipe
+(define (grid-goo-propagate goo-flow grid)
+  (local (
+          ;;column : Direction -> Number
+          ;;adds or subtracts one from the column if moving left or right 
+          [define (column direction)
+            (cond
+              [(direction-right direction) (+ 1 (pipe-posn-x (first (goo-flow-path goo-flow))))]
+              [(direction-left direction) (- (pipe-posn-x (first (goo-flow-path goo-flow))) 1)]
+              [(direction-top direction) (pipe-posn-x (first (goo-flow-path goo-flow)))]
+              [(direction-bottom direction) (pipe-posn-x (first (goo-flow-path goo-flow)))])]
+          
+          ;;row : Direction -> Number
+          ;;adds or subtracts one from the row if moving up or down 
+          [define (row direction)
+            (cond
+              [(direction-right direction) (pipe-posn-y (first (goo-flow-path goo-flow)))]
+              [(direction-left direction)(pipe-posn-y (first (goo-flow-path goo-flow)))]
+              [(direction-top direction)(- (pipe-posn-y (first (goo-flow-path goo-flow))) 1)]
+              [(direction-bottom direction)(+ 1 (pipe-posn-y (first (goo-flow-path goo-flow))))])]
+          
+          ;;pipe-adjacent-direction : Direction -> OptionalPipe 
+          ;; determines if there is a pipe in the output direction of the previous pipe opening
+          [define (pipe-adjacent-direction direction)
+            (cond
+              [(direction-right direction) (pipe-at grid (row direction) (column direction))]
+              [(direction-left direction) (pipe-at grid (row direction) (column direction))]
+              [(direction-top direction) (pipe-at grid (row direction) (column direction))]
+              [(direction-bottom direction) (pipe-at grid (row direction) (column direction))])]
+              
+          ;; goo-into-next-pipe? : Direction -> Boolean
+          ;; can the goo flow into the adjactent pipe
+          [define (goo-into-next-pipe? direction)
+            (cond
+              [(not (pipe? (pipe-adjacent-direction direction))) #false]
+              [(direction-right (goo-flow-direction goo-flow)) (pipe-left (pipe-adjacent-direction DIRECTION-RIGHT))]
+              [(direction-left (goo-flow-direction goo-flow)) (pipe-right (pipe-adjacent-direction DIRECTION-LEFT))]
+              [(direction-top (goo-flow-direction goo-flow)) (pipe-bot (pipe-adjacent-direction DIRECTION-TOP))]
+              [(direction-bottom (goo-flow-direction goo-flow)) (pipe-top (pipe-adjacent-direction DIRECTION-BOTTOM))])]
+
+          ;; output-direction : Pipe -> Direction
+          ;; takes in a pipe and returns the output direction of said pipe
+          [define (output-direction adjacent-pipe)
+            (cond
+              [(direction-left (goo-flow-direction goo-flow)) (if (pipe-left adjacent-pipe)
+                                                                  (make-direction #f #t #f #f)
+                                                                  (if (pipe-top adjacent-pipe)
+                                                                      (make-direction #f #f #t #f)
+                                                                      (make-direction #f #f #f #t)))]
+              [(direction-right (goo-flow-direction goo-flow))(if (pipe-right adjacent-pipe)
+                                                                  (make-direction #t #f #f #f)
+                                                                  (if (pipe-top adjacent-pipe)
+                                                                      (make-direction #f #f #t #f)
+                                                                      (make-direction #f #f #f #t)))]
+              [(direction-top (goo-flow-direction goo-flow))(if (pipe-top adjacent-pipe)
+                                                                (make-direction #f #f #t #f)
+                                                                (if (pipe-right adjacent-pipe)
+                                                                    (make-direction #t #f #f #f)
+                                                                    (make-direction #f #t #f #f)))]
+              [(direction-bottom (goo-flow-direction goo-flow))(if (pipe-bot adjacent-pipe)
+                                                                   (make-direction #f #f #f #t)
+                                                                   (if (pipe-right adjacent-pipe)
+                                                                       (make-direction #t #f #f #f)
+                                                                       (make-direction #f #t #f #f)))])])
+                   
+
+    (if (pipe? (pipe-adjacent-direction (goo-flow-direction goo-flow)))
+        (if (goo-into-next-pipe? (goo-flow-direction goo-flow))
+            (make-goo-flow (cons (make-pipe-posn (pipe-adjacent-direction (goo-flow-direction goo-flow))
+                                                 (column (goo-flow-direction goo-flow))
+                                                 (row (goo-flow-direction goo-flow))
+                                                 #true
+                                                 (goo-flow-direction goo-flow))
+                                 (goo-flow-path goo-flow))
+                           (output-direction (pipe-adjacent-direction (goo-flow-direction goo-flow))))
+            goo-flow)
+        goo-flow)))
+                           
+
+       
+                
+
+(check-expect (grid-goo-propagate GOO-FLOW-4 GRID-5) (make-goo-flow (list (make-pipe-posn PIPE-TR 0 2 #true DIRECTION-BOTTOM) PIPE-POSN-9)
+                                                                    DIRECTION-RIGHT))
+(check-expect (grid-goo-propagate GOO-FLOW-1 GRID-4) (make-goo-flow (list (make-pipe-posn PIPE-BL 4 3 #true DIRECTION-TOP) PIPE-POSN-0)
+                                                                    DIRECTION-LEFT))
+(check-expect (grid-goo-propagate GOO-FLOW-5 GRID-6) (make-goo-flow (list (make-pipe-posn PIPE-TR 2 2 #true DIRECTION-LEFT) PIPE-POSN-11)
+                                                                    DIRECTION-TOP))
+            
+                                             
+(define-struct game-state [grid pipes tile-side-length pipe-width starting-pipe goo-flow time num-replaced])
+;;a GameState is a (make-game-state Grid [List-of Pipe] Number Number Pipe GooFlow Number Number)
+;;a GameState is a:
+;; - Grid is the grid defined above
+;; - Pipes is a list of pipes that are to be placed
+;; - Tile Side Length is the side length of the tile
+;; - Pipe Width is the width of the pipe
+;; - Starting Pipe is the pipe-posn of the starting pipe
+;; - Goo-flow is the GooFlow
+;; - Time is the time until the next goo propagates
+;; - Number-Replaced is the number of pipes that have been replaced 
+(define GS-0 (make-game-state GRID-0
+                              (list PIPE-TL PIPE-BL PIPE-LR PIPE-BR PIPE-TR PIPE-TBLR)
+                              25 5 PIPE-POSN-0 GOO-FLOW-1 140 0))
+(define GS-1 (make-game-state GRID-1
+                              (list PIPE-TL PIPE-BL PIPE-LR PIPE-BL PIPE-TR PIPE-TBLR)
+                              25 5 PIPE-POSN-0 GOO-FLOW-1 140 0))
+(define GS-2 (make-game-state GRID-1 (list PIPE-BL) 25 5 PIPE-POSN-0 GOO-FLOW-1 140 0))
+(define GS-3 (make-game-state GRID-2
+                              (list PIPE-TL PIPE-TB PIPE-BR PIPE-TR PIPE-LR PIPE-BR PIPE-TBLR PIPE-TL PIPE-BL PIPE-TBLR)
+                              25 5 PIPE-POSN-0 GOO-FLOW-1 140 0))
+(define GS-4 (make-game-state GRID-7 '() 50 10 PIPE-POSN-0 GOO-FLOW-3 140 0))
+(define GS-5 (make-game-state GRID-8 '() 50 10 PIPE-POSN-9 GOO-FLOW-4 140 0))
+
+(define (game-state-template gs)
+  (...(grid-template(game-state-grid gs))...
+      (game-state-pipes gs)...
+      (game-state-tile-side-length gs)...
+      (game-state-pipe-width gs)
+      (game-state-starting-pipe gs)...
+      (game-state-goo-flow gs)...
+      (game-state-time gs)...
+      (game-state-num-replaced gs)...))
+
+(define TILE-SIDE-LENGTH 50)
+(define PIPE-WIDTH 10)
+
+
+;;gamestate-init : Number Number Number Direction [List-of Pipes] -> GameState
+;;takes in the dimensions, x y position of the starting pipe, direction of the goo
+;;flow and then the list of incoming pipes 
+(define (gamestate-init dimension x y direction lop)
+  (local (
+          [define (starting-pipe direction)
+            (cond
+              [(direction-right direction) START-PIPE-R]
+              [(direction-left direction) START-PIPE-L]
+              [(direction-top direction) START-PIPE-T]
+              [(direction-bottom direction) START-PIPE-B])])
+    (make-game-state
+     (make-grid
+      (list (make-pipe-posn
+             (starting-pipe direction)
+             x y #true
+             direction))
+      dimension)
+     lop
+     TILE-SIDE-LENGTH
+     PIPE-WIDTH
+     (starting-pipe direction)
+     (make-goo-flow
+      (list (make-pipe-posn
+             (starting-pipe direction)
+             x y #true
+             direction))
+      direction)
+     140
+     0)))
+
+(check-expect (gamestate-init 7 2 2 DIRECTION-RIGHT (list PIPE-TL PIPE-TR PIPE-TBLR PIPE-BL))
+              (make-game-state (make-grid (list (make-pipe-posn START-PIPE-R 2 2 #true DIRECTION-RIGHT)) 7)
+                               (list PIPE-TL PIPE-TR PIPE-TBLR PIPE-BL) 50 10 START-PIPE-R
+                               (make-goo-flow (list (make-pipe-posn START-PIPE-R 2 2 #true DIRECTION-RIGHT)) DIRECTION-RIGHT) 140 0))
+(check-expect (gamestate-init 7 1 3 DIRECTION-LEFT (list PIPE-TR PIPE-BL PIPE-TBLR))
+              (make-game-state (make-grid (list (make-pipe-posn START-PIPE-L 1 3 #true DIRECTION-LEFT)) 7)
+                               (list PIPE-TR PIPE-BL PIPE-TBLR) 50 10 START-PIPE-L
+                               (make-goo-flow (list (make-pipe-posn START-PIPE-L 1 3 #true DIRECTION-LEFT)) DIRECTION-LEFT) 140 0))
+(check-expect (gamestate-init 7 0 0 DIRECTION-BOTTOM (list PIPE-TBLR PIPE-LR PIPE-TB PIPE-TL PIPE-TB))
+              (make-game-state (make-grid (list (make-pipe-posn START-PIPE-B 0 0 #true DIRECTION-BOTTOM)) 7)
+                               (list PIPE-TBLR PIPE-LR PIPE-TB PIPE-TL PIPE-TB) 50 10 START-PIPE-B
+                               (make-goo-flow (list (make-pipe-posn START-PIPE-B 0 0 #true DIRECTION-BOTTOM)) DIRECTION-BOTTOM) 140 0))
+
+
+;; place-pipe-on-click : GameState Integer Integer MouseEvent -> GameState`
+;; If the user clicks on a tile and there are incoming pipes available, places
+;; the next incoming pipe on that tile. If no pipes are available, does nothing.
+(define (place-pipe-on-click gs x y mouse)
+  (local (;; x->column : Number
+          [define x->column
+            (inexact->exact (round (/(- x (/ (game-state-tile-side-length gs) 2)) (game-state-tile-side-length gs))))]
+
+          [define col x->column]
+
+          ;; y->row : Number
+          [define y->row
+            (inexact->exact (round (/(- y (/ (game-state-tile-side-length gs) 2)) (game-state-tile-side-length gs))))]
+
+          [define row y->row]
+
+          ;;pipe-fill? Pipe -> Boolean
+          [define (pipe-fill? pipe)
+            (cond
+              [(boolean? pipe) #f]
+              [else (pipe-posn-filled? pipe)])]
+              
+          
+          ;; replace : [List-of Pipes] -> [List-of Pipes]
+          [define (replace lop)
+            (if (and (= col (pipe-posn-x (first lop))) (= row (pipe-posn-y (first lop))))
+                (cons  (make-pipe-posn (first (game-state-pipes gs)) col row #false DIRECTION-NONE) (rest lop))
+                (cons (first lop) (replace (rest lop))))]
+
+          ;;increase-num-replaced
+          [define increase-num-replaced
+            (if (and (pipe? (pipe-at (game-state-grid gs) row col)) (not (pipe-fill? (pipe-at-filled (game-state-grid gs) row col))))
+                (+ 1 (game-state-num-replaced gs))
+                (game-state-num-replaced gs))]
+          
+          ;; all-pipes : [List-of PosnPipes]
+          [define all-pipes
+            (cond
+              [(empty? (game-state-pipes gs)) (grid-pipes (game-state-grid gs))]
+              [(cons? (game-state-pipes gs))
+               (if (pipe? (pipe-at (game-state-grid gs) row col))
+                   (if (not (pipe-posn-filled? (pipe-at-filled (game-state-grid gs) row col)))
+                       (replace (grid-pipes (game-state-grid gs)))
+                       (grid-pipes (game-state-grid gs)))
+                   (cons (make-pipe-posn (first (game-state-pipes gs)) col row #false DIRECTION-NONE) (grid-pipes (game-state-grid gs))))])]
+
+          ;;rest-of-pipes: [List-of Pipes]
+          [define rest-of-pipes
+            (cond
+              [(empty? (game-state-pipes gs)) '()]
+              [else (if (not (pipe-fill? (pipe-at-filled (game-state-grid gs) row col)))
+                        (rest (game-state-pipes gs))
+                        (game-state-pipes gs))])]
+
+          ;;click-in-grid? : Number Number GameState -> Boolean
+          [define click-in-grid? 
+            (and (>= (grid-dimensions (game-state-grid gs)) x->column)
+                 (>= (grid-dimensions (game-state-grid gs)) y->row))])
+
+          
+    (if (and (string=? mouse "button-down") click-in-grid?)
+        (make-game-state (make-grid all-pipes (grid-dimensions(game-state-grid gs))) rest-of-pipes
+                         (game-state-tile-side-length gs) (game-state-pipe-width gs)(game-state-starting-pipe gs)
+                         (game-state-goo-flow gs)(game-state-time gs) increase-num-replaced)
+        gs)))
+
+(check-expect (place-pipe-on-click GS-0 35 50 "button-down")
+              (make-game-state (make-grid (list (make-pipe-posn PIPE-TL 1 2 #false DIRECTION-NONE) PIPE-POSN-0) 7)
+                               (list PIPE-BL PIPE-LR PIPE-BR PIPE-TR PIPE-TBLR) 25 5 PIPE-POSN-0 GOO-FLOW-1 140 0))
+(check-expect (place-pipe-on-click GS-1 50 50 "button-down")
+              (make-game-state (make-grid (list PIPE-POSN-0 (make-pipe-posn PIPE-TL 2 2 #false DIRECTION-NONE) PIPE-POSN-2 PIPE-POSN-3) 10)
+                               (list PIPE-BL PIPE-LR PIPE-BL PIPE-TR PIPE-TBLR) 25 5 PIPE-POSN-0 GOO-FLOW-1 140 1))
+(check-expect (place-pipe-on-click GS-0 35 50 "button-up") GS-0)
+(check-expect (place-pipe-on-click GS-0 3000 3000 "button-down") GS-0)
+
+;;get-score: GameState -> Interger
+;; produces the score of the game based on the length of goo flow and amount of pipes replaced
+(define (get-score gs)
+  (* 50 (- (length (goo-flow-path (game-state-goo-flow gs))) (game-state-num-replaced gs))))
+
+(check-expect (get-score GS-0) 50)
+(check-expect (get-score FIRST-GS) 50)
+(check-expect (get-score GS-4) 100)
+
+
+;;draw-incoming-pipes: [List-of Pipes] Number Number -> Image
+;; draws the list of incoming pipes on the side of the grid
+(define (draw-incoming-pipes lop tile-side-length pipe-width)
+  (cond
+    [(empty? lop) (square tile-side-length "solid" "transparent")]
+    [(= (length lop) 1) (pipe->image (first lop) tile-side-length pipe-width #false DIRECTION-NONE)]
+    [(= (length lop) 2) (overlay/xy
+                         (pipe->image (first lop) tile-side-length pipe-width #false DIRECTION-NONE)
+                         0 (- tile-side-length)
+                         (pipe->image (second lop) tile-side-length pipe-width #false DIRECTION-NONE))]
+    [(= (length lop) 3) (overlay/xy
+                         (overlay/xy
+                          (pipe->image (first lop) tile-side-length pipe-width #false DIRECTION-NONE)
+                          0 (- tile-side-length)
+                          (pipe->image (second lop) tile-side-length pipe-width #false DIRECTION-NONE))
+                         0 (- tile-side-length)
+                         (pipe->image (third lop) tile-side-length pipe-width #false DIRECTION-NONE))]
+    [(>= (length lop) 4) (overlay/xy
+                          (overlay/xy
+                           (overlay/xy
+                            (pipe->image (first lop) tile-side-length pipe-width #false DIRECTION-NONE)
+                            0 (- tile-side-length)
+                            (pipe->image (second lop) tile-side-length pipe-width #false DIRECTION-NONE))
+                           0 (- tile-side-length)
+                           (pipe->image (third lop) tile-side-length pipe-width #false DIRECTION-NONE))
+                          0 (- tile-side-length)
+                          (pipe->image (fourth lop) tile-side-length pipe-width #false DIRECTION-NONE))]))
+
+
+;;mouse-handler: GameState Number Number MouseEvent -> Function
+;;determines what function should run based on whether the incoming
+;;pipes list is empty
+(define (mouse-handler gs x y mouse)
+  (if (empty? (game-state-pipes gs))
+      gs
+      (place-pipe-on-click gs x y mouse)))
+
+;;draw-world: GameState -> Image
+;; draws the world using grid->image 
+(define (draw-world gs)
+  (beside/align "bottom"
+                (grid->image (game-state-grid gs)(game-state-tile-side-length gs)(game-state-pipe-width gs))
+                (above/align "left"
+                             ;(text (number->string (game-state-time gs)) 25 "black")
+                             (text (number->string(get-score gs)) 25 "black")
+                             (draw-incoming-pipes (game-state-pipes gs) (game-state-tile-side-length gs)(game-state-pipe-width gs)))))
+
+;;on-tick-handler : GameState->GameState
+;;uses the tick speed to caluclate when the goo should flow
+(define (on-tick-handler gs)
+  (local (;; new-goo-flow
+          [define new-goo-flow (grid-goo-propagate (game-state-goo-flow gs) (game-state-grid gs))]
+
+          ;;goo-flow-grid-pipes : [List-of Pipes] -> [List-of Pipes]
+          ;;adds a pipe to a goo-flow 
+          [define (goo-flow-grid-pipes pipes)
+            (if  (and (= (pipe-posn-x (first pipes)) (pipe-posn-x (first (goo-flow-path new-goo-flow))))
+                      (= (pipe-posn-y (first pipes)) (pipe-posn-y (first (goo-flow-path new-goo-flow)))))
+                 (cons (make-pipe-posn (pipe-posn-pipe (first pipes))
+                                       (pipe-posn-x (first pipes)) (pipe-posn-y (first pipes))
+                                       #true
+                                       (pipe-posn-direction (first (goo-flow-path new-goo-flow)))) (rest pipes))
+                 (cons (first pipes) (goo-flow-grid-pipes (rest pipes))))]
+           
+          ;;new-grid: Grid -> Grid
+          ;;makes a new grid from an existing grid 
+          [define (new-grid grid)
+            (make-grid
+             (goo-flow-grid-pipes (grid-pipes grid))
+             (grid-dimensions grid))]
+    
+          ;;time-left : GameState 
+          [define time-left
+            (make-game-state (game-state-grid gs) (game-state-pipes gs) (game-state-tile-side-length gs)
+                             (game-state-pipe-width gs)(game-state-starting-pipe gs) (game-state-goo-flow gs)
+                             (- (game-state-time gs) 1) (game-state-num-replaced gs))]
+         
+          ;;time-out: GameState
+          [define time-out
+            (if (= (length (goo-flow-path (game-state-goo-flow gs)))
+                   (length(goo-flow-path (grid-goo-propagate (game-state-goo-flow gs)(game-state-grid gs)))))
+                gs
+                (make-game-state (new-grid (game-state-grid gs)) (game-state-pipes gs) (game-state-tile-side-length gs)
+                                 (game-state-pipe-width gs)(game-state-starting-pipe gs)
+                                 new-goo-flow 28 (game-state-num-replaced gs)))])
+   
+    (cond
+      [(= 0 (game-state-time gs)) time-out]
+      [(> (game-state-time gs) 0) time-left])))
+
+
+
+;; pipe-fantasy: GameState -> GameState
+(define (pipe-fantasy initial-game-state)
+  (big-bang initial-game-state
+    [on-mouse mouse-handler]
+    [on-tick on-tick-handler]
+    [to-draw draw-world]))
+
+
+(define PIPE-POSN-13 (make-pipe-posn START-PIPE-R 1 1 #true DIRECTION-RIGHT))
+(define PIPE-POSN-14 (make-pipe-posn PIPE-BL 2 1 #false DIRECTION-NONE))
+(define PIPE-POSN-15 (make-pipe-posn PIPE-TBLR 2 2 #false DIRECTION-NONE))
+(define PIPE-POSN-16 (make-pipe-posn PIPE-BR 1 2 #false DIRECTION-NONE))
+(define PIPE-POSN-17 (make-pipe-posn PIPE-TBLR 1 3 #false DIRECTION-NONE))
+(define PIPE-POSN-18 (make-pipe-posn PIPE-TR 1 4 #false DIRECTION-NONE))
+(define PIPE-POSN-19 (make-pipe-posn PIPE-TL 2 4 #false DIRECTION-NONE))
+(define PIPE-POSN-20 (make-pipe-posn PIPE-TB 2 3 #false DIRECTION-NONE))
+(define PIPE-POSN-21 (make-pipe-posn PIPE-LR 3 2 #false DIRECTION-NONE))
+(define PIPE-POSN-22 (make-pipe-posn PIPE-TL 4 2 #false DIRECTION-NONE))
+
+(define FIRST-GRID (make-grid (list PIPE-POSN-13 PIPE-POSN-14 PIPE-POSN-15 PIPE-POSN-16
+                                    PIPE-POSN-17 PIPE-POSN-18 PIPE-POSN-19 PIPE-POSN-20
+                                    PIPE-POSN-21 PIPE-POSN-22) 6))
+(define FIRST-GOO-FLOW (make-goo-flow (list PIPE-POSN-13) DIRECTION-RIGHT))
+
+(define FIRST-GS (make-game-state FIRST-GRID (list PIPE-BR PIPE-TB PIPE-LR PIPE-TBLR PIPE-TL)
+                                  50 10 PIPE-POSN-13 FIRST-GOO-FLOW 140 0))
